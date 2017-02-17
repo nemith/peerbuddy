@@ -1,0 +1,39 @@
+DROP TABLE IF EXISTS ix;
+CREATE TABLE ix (
+  id INTEGER PRIMARY KEY,
+  org_id INTEGER,
+  name TEXT,
+  name_long TEXT,
+  city TEXT,
+  country TEXT,
+  created DATETIME,
+  updated DATETIME
+);
+
+DROP TABLE IF EXISTS networks;
+CREATE TABLE networks (
+  id INTEGER PRIMARY KEY,
+  org_id INTEGER,
+  asn INTEGER,
+  name TEXT,
+  aka TEXT,
+  website TEXT,
+  created DATETIME,
+  updated DATETIME
+);
+
+DROP TABLE IF EXISTS network_ix_lans;
+CREATE TABLE network_ix_lans (
+  id INTEGER PRIMARY KEY,
+  net_id INTEGER,
+  ix_id INTEGER,
+  ixlan_id INTEGER,
+  notes TEXT,
+  speed INTEGER,
+  asn INTEGER,
+  ipaddr4 TEXT,
+  ipaddr6 TEXT,
+  is_rs_peer INTEGER NOT NULL,
+  created DATETIME,
+  updated DATETIME
+);

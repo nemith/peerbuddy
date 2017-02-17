@@ -1,0 +1,32 @@
+{{define "content"}}
+<h1>IX Report for AS46489</h1>
+
+<h2>Summary</h2>
+<dl class="dl-horizontal">
+<dt>Total Bandwidth</dt>
+<dd>{{.Summary.Speed}} Mbps</dd>
+<dt>Number of IX connections</dt>
+<dd>{{.Summary.NumNets}}</dd>
+<dt>Unique IX Orgs</dt>
+<dd>{{.Summary.NumOrgs}}
+</dl>
+
+<h2>IX Connections</h2>
+{{ range $ix, $nets := .IXMap }}
+   <h3>{{$ix}}</h3>
+   <table class="table table-bordered">
+       <tr>
+        <th width="33%">IPv4 Address</th>
+        <th width="33%">IPv6 Address</th>
+        <th width="33%">Speed</th>
+       </tr>
+   {{range $nets}}
+   <tr>
+       <td>{{.IPv4Addr}}</td>
+       <td>{{.IPv6Addr}}</td>
+       <td>{{.Speed}} Mbps</td>
+   </tr>
+   {{end}}
+   </table>
+{{ end }}
+{{end}}
