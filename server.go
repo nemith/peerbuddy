@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"net"
 	"net/http"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
@@ -20,6 +23,9 @@ var (
 var (
 	db        *sqlx.DB
 	templates map[string]*template.Template
+
+	nameCacheLock sync.RWMutex
+	nameCache     map[string]string
 )
 
 func init() {
@@ -28,9 +34,10 @@ func init() {
 	if err != nil {
 		log.Fatalf("Cannot connect to db: %v", err)
 	}
-}
 
-func init() {
+	// Init nameCache
+	lookupAddrs()
+
 	if templates == nil {
 		templates = make(map[string]*template.Template)
 	}
@@ -74,9 +81,43 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 type netSummary struct {
-	Speed    int
+	Name     string
 	IPv4Addr string
 	IPv6Addr string
+	Speed    int
+}
+
+func lookupAddrs() error {
+	if nameCache == nil {
+		nameCache = make(map[string]string)
+	}
+
+	rows, err := db.Queryx("SELECT net.ipaddr4 FROM network_ix_lans as net WHERE net.asn = 46489")
+	if err != nil {
+		return err
+	}
+
+	var wg sync.WaitGroup
+	for rows.Next() {
+		var addr string
+		err := rows.Scan(&addr)
+		if err != nil {
+			return err
+		}
+		wg.Add(1)
+		go func(addr string) {
+			defer wg.Done()
+			log.Printf("Looking up name for %s", addr)
+			names, err := net.LookupAddr(addr)
+			if err == nil && len(names) > 0 {
+				nameCacheLock.Lock()
+				nameCache[addr] = names[0]
+				nameCacheLock.Unlock()
+			}
+		}(addr)
+	}
+	wg.Wait()
+	return nil
 }
 
 func ixReportHandler(w http.ResponseWriter, r *http.Request) {
@@ -90,16 +131,24 @@ func ixReportHandler(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		var ixName string
-		net := netSummary{}
-		if err := rows.Scan(&ixName, &net.Speed, &net.IPv4Addr, &net.IPv6Addr); err != nil {
+		netSum := netSummary{
+			Name: "(unknown)",
+		}
+		if err := rows.Scan(&ixName, &netSum.Speed, &netSum.IPv4Addr, &netSum.IPv6Addr); err != nil {
 			panic(err)
 		}
 
+		nameCacheLock.RLock()
+		if name, ok := nameCache[netSum.IPv4Addr]; ok {
+			netSum.Name = name
+		}
+		nameCacheLock.RUnlock()
+
 		_, ok := ixMap[ixName]
 		if !ok {
-			ixMap[ixName] = append([]netSummary{}, net)
+			ixMap[ixName] = append([]netSummary{}, netSum)
 		} else {
-			ixMap[ixName] = append(ixMap[ixName], net)
+			ixMap[ixName] = append(ixMap[ixName], netSum)
 		}
 	}
 	if rows.Err() != nil {
@@ -129,6 +178,16 @@ func ixReportHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.Parse()
+
+	// Update cache ever 5 minutes
+	go func() {
+		for {
+			time.Sleep(5 * time.Minute)
+			if err := lookupAddrs(); err != nil {
+				log.Printf("Cannot update name cachce: %v", err)
+			}
+		}
+	}()
 
 	fs := http.FileServer(http.Dir("static"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))

@@ -16,12 +16,14 @@
    <h3>{{$ix}}</h3>
    <table class="table table-bordered">
        <tr>
-        <th width="33%">IPv4 Address</th>
-        <th width="33%">IPv6 Address</th>
-        <th width="33%">Speed</th>
+        <th width="25%">Name</td>
+        <th width="25%">IPv4 Address</th>
+        <th width="25%">IPv6 Address</th>
+        <th width="25%">Speed</th>
        </tr>
    {{range $nets}}
    <tr>
+       <td>{{.Name}}</td>
        <td>{{.IPv4Addr}}</td>
        <td>{{.IPv6Addr}}</td>
        <td>{{.Speed}} Mbps</td>
